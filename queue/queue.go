@@ -1,44 +1,53 @@
 package queue
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/gomodule/redigo/redis"
 )
 
 type Queue struct {
-	Client *redis.Client
+	Client redis.Conn
+	Ticker *time.Ticker
 }
 
-func NewQueue(options redis.Options) *Queue {
+func NewQueue(conn redis.Conn, delay time.Duration) *Queue {
+	ticker := time.NewTicker(delay)
 	return &Queue{
-		Client: redis.NewClient(&options),
+		Client: conn,
+		Ticker: ticker,
 	}
 }
 
 func (q Queue) Poll(c chan QueueItem) error {
-	items, err := q.Client.ZRangeWithScores("garfunkel.queue", 0, 0).Result()
-	if err != nil {
-		return err
-	}
-
-	for _, item := range items {
-		item.Score = float64(time.Now().Unix())
-		_, err := q.Client.ZAddXX("grafunkel.queue", item).Result()
+	for range q.Ticker.C {
+		result, err := q.Client.Do("ZCOUNT", "garfunkel.queue", 0, time.Now().Add(-10*time.Second).Unix())
 		if err != nil {
 			return err
 		}
 
-		itemString, ok := item.Member.(string)
-		if ok {
-			queueItem := QueueItem{
-				UserId:  strings.Split(itemString, "-")[0],
-				Service: Service(strings.Split(itemString, "-")[1]),
-			}
-			c <- queueItem
+		if result.(int64) == 0 {
+			continue
+		}
+
+		result, err = redis.Strings(q.Client.Do("ZPOPMIN", "garfunkel.queue"))
+		if err != nil {
+			continue
+		}
+
+		item := QueueItem{
+			UserId:  strings.Split(result.([]string)[0], "-")[0],
+			Service: Service(strings.Split(result.([]string)[0], "-")[1]),
+		}
+		c <- item
+
+		_, err = q.Client.Do("ZADD", "garfunkel.queue", "NX", time.Now().Unix(), result.([]string)[0])
+		if err != nil {
+			fmt.Printf("ERROR")
+			continue
 		}
 	}
-
-	return q.Poll(c)
+	return nil
 }

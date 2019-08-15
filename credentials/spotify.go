@@ -3,39 +3,38 @@ package credentials
 import (
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/gomodule/redigo/redis"
 )
 
 // SpotifyStore fetches Spotify user credentials from Redis
 type SpotifyStore struct {
-	Client *redis.Client
+	Client redis.Conn
 }
 
 // NewSpotifyStore creates a Spotify store
-func NewSpotifyStore(options redis.Options) *SpotifyStore {
+func NewSpotifyStore(conn redis.Conn) *SpotifyStore {
 	return &SpotifyStore{
-		Client: redis.NewClient(&options),
+		Client: conn,
 	}
 }
 
 func (s *SpotifyStore) Get(userId string) (*SpotifyCredentials, error) {
 	tokenKey := strings.Join([]string{"garfunkel.credentials.spotify-", userId, ".token"}, "")
 	refreshTokenKey := strings.Join([]string{"garfunkel.credentials.spotify-", userId, ".refresh-token"}, "")
-	expiresAtKey := strings.Join([]string{"garfunkel.credentials.spotify-", userId, ".expires"}, "")
+	//expiresAtKey := strings.Join([]string{"garfunkel.credentials.spotify-", userId, ".expires"}, "")
 
-	token, err := s.Client.Get(tokenKey).Result()
+	token, err := redis.String(s.Client.Do("GET", tokenKey))
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := s.Client.Get(refreshTokenKey).Result()
+	refreshToken, err := redis.String(s.Client.Do("GET", refreshTokenKey))
 	if err != nil {
 		return nil, err
 	}
 
-	expiresAtTimestamp, err := s.Client.Get(expiresAtKey).Result()
+	/*expiresAtTimestamp, err := redis.String(s.Client.Do("GET", expiresAtKey))
 	if err != nil {
 		return nil, err
 	}
@@ -43,13 +42,13 @@ func (s *SpotifyStore) Get(userId string) (*SpotifyCredentials, error) {
 	expiresAt, err := strconv.ParseInt(expiresAtTimestamp, 10, 64)
 	if err != nil {
 		return nil, err
-	}
+	}*/
 
 	return &SpotifyCredentials{
 		UserId:       userId,
 		Token:        token,
 		RefreshToken: refreshToken,
-		ExpiresAt:    time.Unix(expiresAt, 0),
+		//ExpiresAt:    time.Unix(expiresAt, 0),
 	}, nil
 }
 
@@ -60,11 +59,10 @@ func (s *SpotifyStore) Set(credentials *SpotifyCredentials) error {
 
 	expiresAt := strconv.FormatInt(credentials.ExpiresAt.Unix(), 10)
 
-	pipe := s.Client.TxPipeline()
-	pipe.Set(tokenKey, credentials.Token, 0)
-	pipe.Set(refreshTokenKey, credentials.RefreshToken, 0)
-	pipe.Set(expiresAtKey, expiresAt, 0)
-	_, err := pipe.Exec()
+	s.Client.Send("SET", tokenKey, credentials.Token)
+	s.Client.Send("SET", refreshTokenKey, credentials.RefreshToken)
+	s.Client.Send("SET", expiresAtKey, expiresAt)
+	err := s.Client.Flush()
 
 	return err
 }
