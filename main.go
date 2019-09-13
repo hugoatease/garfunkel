@@ -39,10 +39,10 @@ func main() {
 		if err == nil {
 			listen, err = client.GetCurrentlyPlaying(spotifyCredentials.Token)
 			if err != nil && err == clients.ExpiredToken {
-				fmt.Printf("%s", err)
+				fmt.Println("%s", err)
 				tokenResponse, err := client.RefreshAccessToken(spotifyCredentials.RefreshToken)
 				if err != nil {
-					fmt.Printf("%s", err)
+					fmt.Println("%s", err)
 					continue
 				}
 				spotifyCredentials.Token = tokenResponse.AccessToken
@@ -54,12 +54,12 @@ func main() {
 				}
 			}
 		} else {
-			fmt.Printf("%s", err)
+			fmt.Println("%s", err)
 		}
 
 		value, err := json.Marshal(listen)
 		if err != nil {
-			fmt.Printf("%s", err)
+			fmt.Println("%s", err)
 			continue
 		}
 
@@ -70,6 +70,6 @@ func main() {
 			},
 		)
 
-		fmt.Printf("%+v", listen)
+		fmt.Println("%+v", listen)
 	}
 }

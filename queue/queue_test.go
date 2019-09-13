@@ -9,7 +9,7 @@ package queue
 
 	for ok := true; ok; ok = true {
 		item := <-ch
-		fmt.Printf("%+v\n", item)
-		fmt.Printf("%+v\n", ch)
+		fmt.Println("%+v\n", item)
+		fmt.Println("%+v\n", ch)
 	}
 }*/

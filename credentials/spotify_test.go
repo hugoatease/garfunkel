@@ -13,5 +13,5 @@ package credentials
 
 	store.Set(credentials)
 	currentCreds, _ := store.Get("test")
-	fmt.Printf("%+v\n", currentCreds)
+	fmt.Println("%+v\n", currentCreds)
 }*/
