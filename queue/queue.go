@@ -13,6 +13,10 @@ type Queue struct {
 	Ticker *time.Ticker
 }
 
+var (
+	queueScript *redis.Script = redis.NewScript(1, "local r = redis.call('ZPOPMIN', KEYS[1])[1]; redis.call('ZADD', KEYS[1], 'NX', ARGV[1], r); return r;")
+)
+
 func NewQueue(conn redis.Conn, delay time.Duration) *Queue {
 	ticker := time.NewTicker(delay)
 	return &Queue{
@@ -32,22 +36,17 @@ func (q Queue) Poll(c chan QueueItem) error {
 			continue
 		}
 
-		result, err = redis.Strings(q.Client.Do("ZPOPMIN", "garfunkel.queue"))
+		result, err = redis.String(queueScript.Do(q.Client, "garfunkel.queue", time.Now().Unix()))
 		if err != nil {
+			fmt.Printf("Error")
 			continue
 		}
 
 		item := QueueItem{
-			UserId:  strings.Split(result.([]string)[0], "-")[0],
-			Service: Service(strings.Split(result.([]string)[0], "-")[1]),
+			UserId:  strings.Split(result.(string), "-")[0],
+			Service: Service(strings.Split(result.(string), "-")[1]),
 		}
 		c <- item
-
-		_, err = q.Client.Do("ZADD", "garfunkel.queue", "NX", time.Now().Unix(), result.([]string)[0])
-		if err != nil {
-			fmt.Printf("ERROR")
-			continue
-		}
 	}
 	return nil
 }
