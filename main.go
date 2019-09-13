@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -9,6 +11,7 @@ import (
 	"github.com/hugoatease/garfunkel/clients"
 	"github.com/hugoatease/garfunkel/credentials"
 	"github.com/hugoatease/garfunkel/queue"
+	kafka "github.com/segmentio/kafka-go"
 )
 
 func main() {
@@ -19,6 +22,14 @@ func main() {
 	ch := make(chan queue.QueueItem)
 
 	client := clients.NewClient(os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_SECRET"))
+
+	w := kafka.NewWriter(kafka.WriterConfig{
+		Brokers:  []string{os.Getenv("KAFKA_BROKER")},
+		Topic:    "pitcher",
+		Balancer: &kafka.LeastBytes{},
+	})
+
+	defer w.Close()
 
 	go q.Poll(ch)
 
@@ -41,6 +52,19 @@ func main() {
 				}
 			}
 		}
+
+		value, err := json.Marshal(listen)
+		if err != nil {
+			continue
+		}
+
+		w.WriteMessages(context.Background(),
+			kafka.Message{
+				Key:   []byte(item.UserId),
+				Value: value,
+			},
+		)
+
 		fmt.Printf("%+v", listen)
 	}
 }
