@@ -29,6 +29,7 @@ func (q Queue) Poll(c chan QueueItem) error {
 	for range q.Ticker.C {
 		result, err := q.Client.Do("ZCOUNT", "garfunkel.queue", 0, time.Now().Add(-10*time.Second).Unix())
 		if err != nil {
+			fmt.Printf("%s", err)
 			return err
 		}
 
@@ -38,6 +39,7 @@ func (q Queue) Poll(c chan QueueItem) error {
 
 		result, err = redis.String(queueScript.Do(q.Client, "garfunkel.queue", time.Now().Unix()))
 		if err != nil {
+			fmt.Printf("%s", err)
 			fmt.Printf("Error")
 			continue
 		}
