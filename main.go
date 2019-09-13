@@ -15,8 +15,8 @@ import (
 )
 
 func main() {
-	conn, _ := redis.DialURL("redis://")
-	conn2, _ := redis.DialURL("redis://")
+	conn, _ := redis.DialURL(os.Getenv("REDIS_URL"))
+	conn2, _ := redis.DialURL(os.Getenv("REDIS_URL"))
 	q := queue.NewQueue(conn, 500*time.Millisecond)
 	creds := credentials.NewSpotifyStore(conn2)
 	ch := make(chan queue.QueueItem)
@@ -25,7 +25,7 @@ func main() {
 
 	w := kafka.NewWriter(kafka.WriterConfig{
 		Brokers:  []string{os.Getenv("KAFKA_BROKER")},
-		Topic:    "pitcher",
+		Topic:    "garfunkel",
 		Balancer: &kafka.LeastBytes{},
 	})
 
