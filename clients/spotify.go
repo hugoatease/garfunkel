@@ -20,7 +20,7 @@ var (
 	ExpiredToken = errors.New("The access token expired")
 )
 
-func NewClient(clientId string, clientSecret string) *Spotify {
+func NewSpotifyClient(clientId string, clientSecret string) *Spotify {
 	spotify := &Spotify{
 		Client:       &http.Client{},
 		ClientId:     clientId,

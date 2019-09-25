@@ -25,3 +25,21 @@ type SpotifyRefreshTokenResponse struct {
 	ExpiresIn   int64  `json:"expires_in"`
 	Scope       string `json:"scope"`
 }
+
+type DeezerArtist struct {
+	Name string
+}
+
+type DeezerAlbum struct {
+	Title string
+}
+
+type DeezerTrack struct {
+	Timestamp int64
+	Artist    DeezerArtist
+	Album     DeezerAlbum
+}
+
+type DeezerHistory struct {
+	Data []DeezerTrack
+}

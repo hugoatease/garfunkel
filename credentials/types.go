@@ -9,3 +9,7 @@ type SpotifyCredentials struct {
 	RefreshToken string
 	ExpiresAt    time.Time
 }
+
+type DeezerCredentials struct {
+	Token string
+}
