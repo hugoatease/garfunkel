@@ -15,12 +15,20 @@ import (
 )
 
 func main() {
-	conn, _ := redis.DialURL(os.Getenv("REDIS_URL"))
-	conn2, _ := redis.DialURL(os.Getenv("REDIS_URL"))
-	conn3, _ := redis.DialURL(os.Getenv("REDIS_URL"))
-	q := queue.NewQueue(conn, 500*time.Millisecond)
-	creds := credentials.NewSpotifyStore(conn2)
-	deezerCreds := credentials.NewDeezerStore(conn3)
+	redisPool := &redis.Pool{
+		MaxIdle:     3,
+		IdleTimeout: 240 * time.Second,
+		Dial:        func() (redis.Conn, error) { return redis.DialURL(os.Getenv("REDIS_URL")) },
+	}
+
+	conn := redisPool.Get()
+	defer conn.Close()
+	queueConn := redisPool.Get()
+	defer queueConn.Close()
+
+	q := queue.NewQueue(queueConn, 500*time.Millisecond)
+	creds := credentials.NewSpotifyStore(conn)
+	deezerCreds := credentials.NewDeezerStore(conn)
 	ch := make(chan queue.QueueItem)
 
 	client := clients.NewSpotifyClient(os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_SECRET"))
