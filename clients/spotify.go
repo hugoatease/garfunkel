@@ -20,6 +20,15 @@ var (
 	ExpiredToken = errors.New("The access token expired")
 )
 
+func convertSpotifyListen(item SpotifyListen) Listen {
+	return Listen{
+		ArtistName: item.Item.Artists[0].Name,
+		AlbumName:  item.Item.Album.Name,
+		TrackName:  item.Item.Name,
+		Timestamp:  item.Timestamp,
+	}
+}
+
 func NewSpotifyClient(clientId string, clientSecret string) *Spotify {
 	spotify := &Spotify{
 		Client:       &http.Client{},
@@ -29,7 +38,7 @@ func NewSpotifyClient(clientId string, clientSecret string) *Spotify {
 	return spotify
 }
 
-func (c *Spotify) GetCurrentlyPlaying(token string) (*SpotifyListen, error) {
+func (c *Spotify) GetCurrentlyPlaying(token string) (*Listen, error) {
 	req, err := http.NewRequest("GET", "https://api.spotify.com/v1/me/player/currently-playing", nil)
 	if err != nil {
 		return nil, err
@@ -49,13 +58,14 @@ func (c *Spotify) GetCurrentlyPlaying(token string) (*SpotifyListen, error) {
 		return nil, ExpiredToken
 	}
 
-	listen := new(SpotifyListen)
-	err = json.Unmarshal(body, listen)
+	var listen SpotifyListen
+	err = json.Unmarshal(body, &listen)
 	if err != nil {
 		return nil, err
 	}
 
-	return listen, nil
+	finalListen := convertSpotifyListen(listen)
+	return &finalListen, nil
 }
 
 func (c *Spotify) RefreshAccessToken(refreshToken string) (*SpotifyRefreshTokenResponse, error) {

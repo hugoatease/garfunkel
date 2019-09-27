@@ -16,7 +16,7 @@ func NewDeezerStore(conn redis.Conn) *DeezerStore {
 	}
 }
 
-func (s *DeezerStore) Get(userId string) (*DeezerCredentials, error) {
+func (s *DeezerStore) Get(userId string) (*Credentials, error) {
 	tokenKey := strings.Join([]string{"garfunkel.credentials.deezer-", userId, ".token"}, "")
 
 	token, err := redis.String(s.Client.Do("GET", tokenKey))
@@ -24,7 +24,7 @@ func (s *DeezerStore) Get(userId string) (*DeezerCredentials, error) {
 		return nil, err
 	}
 
-	return &DeezerCredentials{
+	return &Credentials{
 		Token: token,
 	}, nil
 }

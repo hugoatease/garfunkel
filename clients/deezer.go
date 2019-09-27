@@ -19,7 +19,16 @@ func NewDeezerClient() *Deezer {
 	return deezer
 }
 
-func (c *Deezer) GetCurrentlyPlaying(token string) (*DeezerTrack, error) {
+func convertDeezerHistory(item DeezerTrack) Listen {
+	return Listen{
+		ArtistName: item.Artist.Name,
+		AlbumName:  item.Album.Title,
+		TrackName:  item.Title,
+		Timestamp:  item.Timestamp,
+	}
+}
+
+func (c *Deezer) GetCurrentlyPlaying(token string) (*Listen, error) {
 	res, err := http.Get("https://api.deezer.com/user/me/history?access_token=" + token)
 	if err != nil {
 		return nil, err
@@ -36,5 +45,6 @@ func (c *Deezer) GetCurrentlyPlaying(token string) (*DeezerTrack, error) {
 		return nil, err
 	}
 
-	return &history.Data[0], nil
+	item := convertDeezerHistory(history.Data[0])
+	return &item, nil
 }

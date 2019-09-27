@@ -1,5 +1,16 @@
 package clients
 
+type Client interface {
+	GetCurrentlyPlaying(string) (*Listen, error)
+}
+
+type Listen struct {
+	ArtistName string
+	AlbumName  string
+	TrackName  string
+	Timestamp  int64
+}
+
 type SpotifyArtist struct {
 	Name string
 }
@@ -38,6 +49,7 @@ type DeezerTrack struct {
 	Timestamp int64
 	Artist    DeezerArtist
 	Album     DeezerAlbum
+	Title     string
 }
 
 type DeezerHistory struct {

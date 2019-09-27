@@ -14,6 +14,52 @@ import (
 	kafka "github.com/segmentio/kafka-go"
 )
 
+var (
+	spotifyClient   clients.Client = clients.NewSpotifyClient(os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_SECRET"))
+	deezerClient    clients.Client = clients.NewDeezerClient()
+	clientsServices                = map[queue.Service]clients.Client{
+		queue.Spotify: spotifyClient,
+		queue.Deezer:  deezerClient,
+	}
+)
+
+func getCurrentlyPlaying(item queue.QueueItem, conn redis.Conn) (*clients.Listen, error) {
+	credentialsStores := map[queue.Service]credentials.CredentialsStore{
+		queue.Spotify: credentials.NewSpotifyStore(conn),
+		queue.Deezer:  credentials.NewDeezerStore(conn),
+	}
+
+	client := clientsServices[item.Service]
+	store := credentialsStores[item.Service]
+
+	var listen *clients.Listen
+
+	creds, err := store.Get(item.UserId)
+	if err != nil {
+		return nil, err
+	}
+
+	listen, err = client.GetCurrentlyPlaying(creds.Token)
+	if err != nil {
+		if err != clients.ExpiredToken {
+			return nil, err
+		}
+
+		tokenResponse, err := client.(*clients.Spotify).RefreshAccessToken(creds.RefreshToken)
+		if err != nil {
+			fmt.Printf("%s", err)
+			return nil, err
+		}
+		creds.Token = tokenResponse.AccessToken
+		creds.ExpiresAt = time.Now().Add(time.Duration(tokenResponse.ExpiresIn) * time.Second)
+		store.(*credentials.SpotifyStore).Set(creds)
+
+		return getCurrentlyPlaying(item, conn)
+	}
+
+	return listen, nil
+}
+
 func main() {
 	redisPool := &redis.Pool{
 		MaxIdle:     3,
@@ -27,12 +73,7 @@ func main() {
 	defer queueConn.Close()
 
 	q := queue.NewQueue(queueConn, 500*time.Millisecond)
-	creds := credentials.NewSpotifyStore(conn)
-	deezerCreds := credentials.NewDeezerStore(conn)
 	ch := make(chan queue.QueueItem)
-
-	client := clients.NewSpotifyClient(os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_SECRET"))
-	deezerClient := clients.NewDeezerClient()
 
 	w := kafka.NewWriter(kafka.WriterConfig{
 		Brokers:  []string{os.Getenv("KAFKA_BROKER")},
@@ -45,42 +86,9 @@ func main() {
 	go q.Poll(ch)
 
 	for item := range ch {
-		var listen interface{}
-		switch service := item.Service; service {
-		case "spotify":
-			spotifyCredentials, err := creds.Get(item.UserId)
-			if err == nil {
-				listen, err = client.GetCurrentlyPlaying(spotifyCredentials.Token)
-				if err != nil && err == clients.ExpiredToken {
-					fmt.Printf("%s", err)
-					tokenResponse, err := client.RefreshAccessToken(spotifyCredentials.RefreshToken)
-					if err != nil {
-						fmt.Printf("%s", err)
-						continue
-					}
-					spotifyCredentials.Token = tokenResponse.AccessToken
-					spotifyCredentials.ExpiresAt = time.Now().Add(time.Duration(tokenResponse.ExpiresIn) * time.Second)
-					creds.Set(spotifyCredentials)
-					listen, err = client.GetCurrentlyPlaying(tokenResponse.AccessToken)
-					if err != nil {
-						continue
-					}
-				}
-			} else {
-				fmt.Printf("%s", err)
-			}
-
-		case "deezer":
-			deezerCredentials, err := deezerCreds.Get(item.UserId)
-			if err == nil {
-				listen, err = deezerClient.GetCurrentlyPlaying(deezerCredentials.Token)
-				if err != nil {
-					fmt.Printf("%s", err)
-					continue
-				}
-			} else {
-				fmt.Printf("%s", err)
-			}
+		listen, err := getCurrentlyPlaying(item, conn)
+		if err != nil {
+			continue
 		}
 
 		value, err := json.Marshal(listen)

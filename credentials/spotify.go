@@ -19,7 +19,7 @@ func NewSpotifyStore(conn redis.Conn) *SpotifyStore {
 	}
 }
 
-func (s *SpotifyStore) Get(userId string) (*SpotifyCredentials, error) {
+func (s *SpotifyStore) Get(userId string) (*Credentials, error) {
 	tokenKey := strings.Join([]string{"garfunkel.credentials.spotify-", userId, ".token"}, "")
 	refreshTokenKey := strings.Join([]string{"garfunkel.credentials.spotify-", userId, ".refresh-token"}, "")
 	//expiresAtKey := strings.Join([]string{"garfunkel.credentials.spotify-", userId, ".expires"}, "")
@@ -44,7 +44,7 @@ func (s *SpotifyStore) Get(userId string) (*SpotifyCredentials, error) {
 		return nil, err
 	}*/
 
-	return &SpotifyCredentials{
+	return &Credentials{
 		UserId:       userId,
 		Token:        token,
 		RefreshToken: refreshToken,
@@ -52,7 +52,7 @@ func (s *SpotifyStore) Get(userId string) (*SpotifyCredentials, error) {
 	}, nil
 }
 
-func (s *SpotifyStore) Set(credentials *SpotifyCredentials) error {
+func (s *SpotifyStore) Set(credentials *Credentials) error {
 	tokenKey := strings.Join([]string{"garfunkel.credentials.spotify-", credentials.UserId, ".token"}, "")
 	refreshTokenKey := strings.Join([]string{"garfunkel.credentials.spotify-", credentials.UserId, ".refresh-token"}, "")
 	expiresAtKey := strings.Join([]string{"garfunkel.credentials.spotify-", credentials.UserId, ".expires"}, "")
