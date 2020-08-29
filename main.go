@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/gomodule/redigo/redis"
 	"github.com/hugoatease/garfunkel/clients"
 	"github.com/hugoatease/garfunkel/credentials"
@@ -51,7 +52,22 @@ func getCurrentlyPlaying(item queue.QueueItem, clientsServices clientInstances, 
 	return listen, nil
 }
 
+func createMqttClient(url string) (*mqtt.Client, mqtt.Token) {
+	mqttClientOpts := mqtt.NewClientOptions()
+	mqttClientOpts.AddBroker(url)
+	mqttClientOpts.SetAutoReconnect(true)
+	mqttClient := mqtt.NewClient(mqttClientOpts)
+	connectToken := mqttClient.Connect()
+	connectToken.Wait()
+	return &mqttClient, connectToken
+}
+
 func fetchListens(c *cli.Context) error {
+	var (
+		kafkaWriter *kafka.Writer
+		mqttClient  *mqtt.Client
+	)
+
 	redisPool := &redis.Pool{
 		MaxIdle:     3,
 		IdleTimeout: 240 * time.Second,
@@ -77,18 +93,30 @@ func fetchListens(c *cli.Context) error {
 		clientsServices[queue.Spotify] = spotifyClient
 	}
 
-	if !c.IsSet("kafka-url") {
-		fmt.Print("Error: Kafka broker URL must be specified\n\n")
-		cli.ShowAppHelpAndExit(c, 1)
+	if c.IsSet("kafka-url") {
+		kafkaWriter = kafka.NewWriter(kafka.WriterConfig{
+			Brokers:  []string{c.String("kafka-url")},
+			Topic:    "garfunkel",
+			Balancer: &kafka.LeastBytes{},
+		})
+
+		defer kafkaWriter.Close()
 	}
 
-	kafkaWriter := kafka.NewWriter(kafka.WriterConfig{
-		Brokers:  []string{c.String("kafka-url")},
-		Topic:    "garfunkel",
-		Balancer: &kafka.LeastBytes{},
-	})
+	if c.IsSet("mqtt-url") {
+		var connectToken mqtt.Token
+		mqttClient, connectToken = createMqttClient(c.String("mqtt-url"))
+		err := connectToken.Error()
+		if err != nil {
+			fmt.Printf("%+v", err)
+			return err
+		}
+	}
 
-	defer kafkaWriter.Close()
+	if !c.IsSet("kafka-url") && !c.IsSet("mqtt-url") {
+		fmt.Print("Error: Kafka or MQTT broker URL must be specified\n\n")
+		cli.ShowAppHelpAndExit(c, 1)
+	}
 
 	q := queue.NewQueue(queueConn, 500*time.Millisecond)
 	ch := make(chan queue.QueueItem)
@@ -107,14 +135,20 @@ func fetchListens(c *cli.Context) error {
 			continue
 		}
 
-		kafkaWriter.WriteMessages(context.Background(),
-			kafka.Message{
-				Key:   []byte(item.UserId),
-				Value: value,
-			},
-		)
+		if kafkaWriter != nil {
+			kafkaWriter.WriteMessages(context.Background(),
+				kafka.Message{
+					Key:   []byte(item.UserId),
+					Value: value,
+				},
+			)
+		}
 
-		fmt.Printf("%+v", listen)
+		if mqttClient != nil {
+			(*mqttClient).Publish("garfunkel/status/"+item.UserId, 0, false, value)
+		}
+
+		fmt.Printf("%+v\n", listen)
 	}
 
 	return nil
@@ -141,6 +175,10 @@ func main() {
 			&cli.StringFlag{
 				Name:    "kafka-url",
 				EnvVars: []string{"KAFKA_URL"},
+			},
+			&cli.StringFlag{
+				Name:    "mqtt-url",
+				EnvVars: []string{"MQTT_URL"},
 			},
 		},
 		Action: fetchListens,
