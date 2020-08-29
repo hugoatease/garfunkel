@@ -21,12 +21,18 @@ var (
 )
 
 func convertSpotifyListen(item SpotifyListen) Listen {
-	return Listen{
+	listen := Listen{
 		ArtistName: item.Item.Artists[0].Name,
 		AlbumName:  item.Item.Album.Name,
 		TrackName:  item.Item.Name,
 		Timestamp:  item.Timestamp,
 	}
+
+	if len(item.Item.Album.Images) > 0 {
+		listen.ImageURL = item.Item.Album.Images[0].URL
+	}
+
+	return listen
 }
 
 func NewSpotifyClient(clientId string, clientSecret string) *Spotify {

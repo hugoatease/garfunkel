@@ -9,14 +9,22 @@ type Listen struct {
 	AlbumName  string
 	TrackName  string
 	Timestamp  int64
+	ImageURL   string
 }
 
 type SpotifyArtist struct {
 	Name string
 }
 
+type SpotifyImage struct {
+	Height int64
+	Width  int64
+	URL    string
+}
+
 type SpotifyAlbum struct {
-	Name string
+	Name   string
+	Images []SpotifyImage
 }
 
 type SpotifyTrack struct {
