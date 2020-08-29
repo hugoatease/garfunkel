@@ -1,3 +1,5 @@
+# github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d
+github.com/cpuguy83/go-md2man/v2/md2man
 # github.com/golang/snappy v0.0.1
 github.com/golang/snappy
 # github.com/gomodule/redigo v1.8.2
@@ -12,6 +14,8 @@ github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/pierrec/lz4 v2.0.5+incompatible
 github.com/pierrec/lz4
 github.com/pierrec/lz4/internal/xxh32
+# github.com/russross/blackfriday/v2 v2.0.1
+github.com/russross/blackfriday/v2
 # github.com/segmentio/kafka-go v0.4.2
 ## explicit
 github.com/segmentio/kafka-go
@@ -33,3 +37,8 @@ github.com/segmentio/kafka-go/protocol/produce
 github.com/segmentio/kafka-go/protocol/saslauthenticate
 github.com/segmentio/kafka-go/protocol/saslhandshake
 github.com/segmentio/kafka-go/sasl
+# github.com/shurcooL/sanitized_anchor_name v1.0.0
+github.com/shurcooL/sanitized_anchor_name
+# github.com/urfave/cli/v2 v2.2.0
+## explicit
+github.com/urfave/cli/v2

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -12,23 +13,13 @@ import (
 	"github.com/hugoatease/garfunkel/credentials"
 	"github.com/hugoatease/garfunkel/queue"
 	kafka "github.com/segmentio/kafka-go"
+	"github.com/urfave/cli/v2"
 )
 
-var (
-	spotifyClient   clients.Client = clients.NewSpotifyClient(os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_SECRET"))
-	deezerClient    clients.Client = clients.NewDeezerClient()
-	clientsServices                = map[queue.Service]clients.Client{
-		queue.Spotify: spotifyClient,
-		queue.Deezer:  deezerClient,
-	}
-)
+type clientInstances map[queue.Service]clients.Client
+type credentialsInstances map[queue.Service]credentials.CredentialsStore
 
-func getCurrentlyPlaying(item queue.QueueItem, conn redis.Conn) (*clients.Listen, error) {
-	credentialsStores := map[queue.Service]credentials.CredentialsStore{
-		queue.Spotify: credentials.NewSpotifyStore(conn),
-		queue.Deezer:  credentials.NewDeezerStore(conn),
-	}
-
+func getCurrentlyPlaying(item queue.QueueItem, clientsServices clientInstances, credentialsStores credentialsInstances) (*clients.Listen, error) {
 	client := clientsServices[item.Service]
 	store := credentialsStores[item.Service]
 
@@ -54,17 +45,17 @@ func getCurrentlyPlaying(item queue.QueueItem, conn redis.Conn) (*clients.Listen
 		creds.ExpiresAt = time.Now().Add(time.Duration(tokenResponse.ExpiresIn) * time.Second)
 		store.(*credentials.SpotifyStore).Set(creds)
 
-		return getCurrentlyPlaying(item, conn)
+		return getCurrentlyPlaying(item, clientsServices, credentialsStores)
 	}
 
 	return listen, nil
 }
 
-func main() {
+func fetchListens(c *cli.Context) error {
 	redisPool := &redis.Pool{
 		MaxIdle:     3,
 		IdleTimeout: 240 * time.Second,
-		Dial:        func() (redis.Conn, error) { return redis.DialURL(os.Getenv("REDIS_URL")) },
+		Dial:        func() (redis.Conn, error) { return redis.DialURL(c.String("redis-url")) },
 	}
 
 	conn := redisPool.Get()
@@ -72,21 +63,40 @@ func main() {
 	queueConn := redisPool.Get()
 	defer queueConn.Close()
 
-	q := queue.NewQueue(queueConn, 500*time.Millisecond)
-	ch := make(chan queue.QueueItem)
+	credentialsStores := credentialsInstances{
+		queue.Spotify: credentials.NewSpotifyStore(conn),
+		queue.Deezer:  credentials.NewDeezerStore(conn),
+	}
 
-	w := kafka.NewWriter(kafka.WriterConfig{
-		Brokers:  []string{os.Getenv("KAFKA_BROKER")},
+	clientsServices := clientInstances{
+		queue.Deezer: clients.NewDeezerClient(),
+	}
+
+	if c.IsSet("spotify-api-id") && c.IsSet("spotify-api-secret") {
+		spotifyClient := clients.NewSpotifyClient(c.String("spotify-api-id"), c.String("spotify-api-secret"))
+		clientsServices[queue.Spotify] = spotifyClient
+	}
+
+	if !c.IsSet("kafka-url") {
+		fmt.Print("Error: Kafka broker URL must be specified\n\n")
+		cli.ShowAppHelpAndExit(c, 1)
+	}
+
+	kafkaWriter := kafka.NewWriter(kafka.WriterConfig{
+		Brokers:  []string{c.String("kafka-url")},
 		Topic:    "garfunkel",
 		Balancer: &kafka.LeastBytes{},
 	})
 
-	defer w.Close()
+	defer kafkaWriter.Close()
+
+	q := queue.NewQueue(queueConn, 500*time.Millisecond)
+	ch := make(chan queue.QueueItem)
 
 	go q.Poll(ch)
 
 	for item := range ch {
-		listen, err := getCurrentlyPlaying(item, conn)
+		listen, err := getCurrentlyPlaying(item, clientsServices, credentialsStores)
 		if err != nil {
 			continue
 		}
@@ -97,7 +107,7 @@ func main() {
 			continue
 		}
 
-		w.WriteMessages(context.Background(),
+		kafkaWriter.WriteMessages(context.Background(),
 			kafka.Message{
 				Key:   []byte(item.UserId),
 				Value: value,
@@ -105,5 +115,39 @@ func main() {
 		)
 
 		fmt.Printf("%+v", listen)
+	}
+
+	return nil
+}
+
+func main() {
+	app := &cli.App{
+		Name:  "garfunkel",
+		Usage: "publish Spotify/Deezer listens to Kafka/MQTT",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "spotify-api-id",
+				EnvVars: []string{"SPOTIFY_API_ID"},
+			},
+			&cli.StringFlag{
+				Name:    "spotify-api-secret",
+				EnvVars: []string{"SPOTIFY_API_SECRET"},
+			},
+			&cli.StringFlag{
+				Name:    "redis-url",
+				EnvVars: []string{"REDIS_URL"},
+				Value:   "redis://localhost:6379",
+			},
+			&cli.StringFlag{
+				Name:    "kafka-url",
+				EnvVars: []string{"KAFKA_URL"},
+			},
+		},
+		Action: fetchListens,
+	}
+
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
