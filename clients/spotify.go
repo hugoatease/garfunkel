@@ -26,6 +26,8 @@ func convertSpotifyListen(item SpotifyListen) Listen {
 		AlbumName:  item.Item.Album.Name,
 		TrackName:  item.Item.Name,
 		Timestamp:  item.Timestamp,
+		DurationMs: item.Item.DurationMs,
+		ServiceID:  item.Item.ID,
 	}
 
 	if len(item.Item.Album.Images) > 0 {

@@ -10,6 +10,8 @@ type Listen struct {
 	TrackName  string
 	Timestamp  int64
 	ImageURL   string
+	DurationMs int64
+	ServiceID  string
 }
 
 type SpotifyArtist struct {
@@ -28,9 +30,11 @@ type SpotifyAlbum struct {
 }
 
 type SpotifyTrack struct {
-	Name    string
-	Album   SpotifyAlbum
-	Artists []SpotifyArtist
+	Name       string
+	Album      SpotifyAlbum
+	Artists    []SpotifyArtist
+	ID         string
+	DurationMs int64 `json:"duration_ms"`
 }
 
 type SpotifyListen struct {
