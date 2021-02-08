@@ -22,12 +22,14 @@ var (
 
 func convertSpotifyListen(item SpotifyListen) Listen {
 	listen := Listen{
-		ArtistName: item.Item.Artists[0].Name,
-		AlbumName:  item.Item.Album.Name,
-		TrackName:  item.Item.Name,
-		Timestamp:  item.Timestamp,
-		DurationMs: item.Item.DurationMs,
-		ServiceID:  item.Item.ID,
+		ArtistName:   item.Item.Artists[0].Name,
+		AlbumName:    item.Item.Album.Name,
+		TrackName:    item.Item.Name,
+		Timestamp:    item.Timestamp,
+		DurationMs:   item.Item.DurationMs,
+		ServiceID:    item.Item.ID,
+		IsPlaying:    item.IsPlaying,
+		IsHistorical: false,
 	}
 
 	if len(item.Item.Album.Images) > 0 {

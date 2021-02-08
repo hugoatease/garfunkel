@@ -21,10 +21,12 @@ func NewDeezerClient() *Deezer {
 
 func convertDeezerHistory(item DeezerTrack) Listen {
 	return Listen{
-		ArtistName: item.Artist.Name,
-		AlbumName:  item.Album.Title,
-		TrackName:  item.Title,
-		Timestamp:  item.Timestamp,
+		ArtistName:   item.Artist.Name,
+		AlbumName:    item.Album.Title,
+		TrackName:    item.Title,
+		Timestamp:    item.Timestamp,
+		IsPlaying:    true,
+		IsHistorical: true,
 	}
 }
 

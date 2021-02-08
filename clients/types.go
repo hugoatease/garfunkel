@@ -5,13 +5,15 @@ type Client interface {
 }
 
 type Listen struct {
-	ArtistName string
-	AlbumName  string
-	TrackName  string
-	Timestamp  int64
-	ImageURL   string
-	DurationMs int64
-	ServiceID  string
+	ArtistName   string
+	AlbumName    string
+	TrackName    string
+	Timestamp    int64
+	ImageURL     string
+	DurationMs   int64
+	ServiceID    string
+	IsPlaying    bool
+	IsHistorical bool
 }
 
 type SpotifyArtist struct {
@@ -40,6 +42,7 @@ type SpotifyTrack struct {
 type SpotifyListen struct {
 	Timestamp int64
 	Item      SpotifyTrack
+	IsPlaying bool `json:"is_playing"`
 }
 
 type SpotifyRefreshTokenResponse struct {
